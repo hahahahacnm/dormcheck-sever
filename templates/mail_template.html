@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{.Subject}}</title>
+  <style>
+    body {
+      font-family: "Segoe UI", "Noto Sans", sans-serif;
+      background: #fdfcfb;
+      margin: 0;
+      padding: 40px 0;
+      color: #444;
+      line-height: 1.6;
+    }
+
+    .email-container {
+      max-width: 600px;
+      margin: auto;
+      background: white url('https://q1.qlogo.cn/g?b=qq&nk=2219911811&s=640') top 24px right 24px no-repeat;
+      background-size: 64px;
+      border-radius: 16px;
+      padding: 32px;
+      padding-top: 48px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      position: relative;
+    }
+
+    .header {
+      font-size: 26px;
+      font-weight: bold;
+      color: #2D3748;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+    }
+
+    .header::before {
+      content: "🐾";
+      margin-right: 10px;
+      font-size: 28px;
+    }
+
+    .content p {
+      margin: 18px 0;
+      font-size: 16px;
+    }
+
+    .btn {
+      display: inline-block;
+      margin-top: 28px;
+      background: linear-gradient(to right, #ff9a9e, #fad0c4);
+      color: white;
+      padding: 12px 24px;
+      border-radius: 10px;
+      text-decoration: none;
+      font-weight: bold;
+      font-size: 15px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+      transition: background 0.3s ease;
+    }
+
+    .btn:hover {
+      background: linear-gradient(to right, #ff7b89, #fcb5b5);
+    }
+
+    .footer {
+      margin-top: 48px;
+      font-size: 13px;
+      color: #888;
+      text-align: center;
+      border-top: 1px solid #eee;
+      padding-top: 16px;
+    }
+
+    .paw-icon {
+      position: absolute;
+      bottom: 16px;
+      right: 16px;
+      font-size: 38px;
+      opacity: 0.2;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="email-container">
+    <div class="header">{{.Subject}}</div>
+    <div class="content">
+      {{/* 这里的 Body 传入 template.HTML 类型，确保不被转义 */}}
+      {{.Body}}
+
+      {{if .ActionURL}}
+        <a href="{{.ActionURL}}" class="btn">{{.ActionText}}</a>
+      {{end}}
+    </div>
+    <div class="footer">
+      来自 DormCheck 🐾 — 感谢每一位支持本站的朋友！<br/>
+      如非你本人操作，请忽略此邮件。
+    </div>
+    <div class="paw-icon">🐾</div>
+  </div>
+</body>
+</html>
