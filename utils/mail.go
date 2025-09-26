@@ -13,10 +13,10 @@ import (
 // ========== 配置你的邮箱信息 ==========
 
 const (
-	SMTPHost     = "smtp.qq.com"
+	SMTPHost     = "smtp.exmail.qq.com"
 	SMTPPort     = 465
-	SMTPUser     = "填入你的QQ邮箱地址，自定义"
-	SMTPPassword = "QQ邮箱秘钥，自定义"
+	SMTPUser     = "kiki@kikirepository.cn"
+	SMTPPassword = "etujAmAzvM36cdek"
 	FromName     = "DormCheck 系统"
 )
 
@@ -106,3 +106,26 @@ func SendSignResultEmail(to string, stuName, activityName string, success bool, 
 
 	return SendMail(to, subject, html, "", "")
 }
+
+// SendAccountErrorEmail 发送账号异常通知邮件
+func SendAccountErrorEmail(to, stuName, stuId, errorMsg string, sendTime time.Time) error {
+	timeStr := sendTime.Format("2006-01-02 15:04:05")
+
+	html := fmt.Sprintf(`
+		<p>您好，系统检测到您绑定的账号信息存在误差：</p>
+		<p>学生姓名：<strong>%s</strong></p>
+		<p>学号：<strong>%s</strong></p>
+		<p style="color: red;"><strong>❌ 登录状态刷新失败</strong></p>
+		<p>失败原因：%s</p>
+		<p>请检查您的微学工账号密码是否已在 DormCheck 平台正确录入，并及时修改。</p>
+		<p>如您无法解决问题，请加QQ群咨询：<strong>947767423</strong>。</p>
+		<p>检测时间：%s</p>
+		<p>感谢您使用 DormCheck 签到平台。</p>
+	`, stuName, stuId, errorMsg, timeStr)
+
+	subject := "微学工绑定异常提醒"
+
+	return SendMail(to, subject, html, "", "")
+}
+
+
