@@ -12,12 +12,22 @@ import (
 	"time"
 )
 
+// LoginFailWithG 封装登录失败信息和 g 值
+type LoginFailWithG struct {
+	Err error   // 原始错误信息
+	G   string  // 初始密码修改标识
+}
+
+func (e *LoginFailWithG) Error() string {
+	return e.Err.Error()
+}
+
 // LoginAndBindStudent 尝试登录微学工平台，并保存学生信息 + 用户绑定 + 姓名
 func LoginAndBindStudent(userID int, stuID, plainPassword string) error {
 	var lastErr error
 	db := database.DB
 
-	// 🧠 新增：判断绑定数量限制
+	// 判断绑定数量限制
 	var user database.User
 	if err := db.First(&user, userID).Error; err != nil {
 		return fmt.Errorf("用户不存在")
@@ -29,11 +39,11 @@ func LoginAndBindStudent(userID int, stuID, plainPassword string) error {
 	}
 
 	switch user.Role {
-	case 1: // 普通用户
+	case 1:
 		if currentCount >= 2 {
 			return fmt.Errorf("普通用户最多只能绑定 2 名学生")
 		}
-	case 2: // 赞助用户
+	case 2:
 		if currentCount >= 12 {
 			return fmt.Errorf("赞助用户最多只能绑定 12 名学生")
 		}
@@ -57,15 +67,28 @@ func LoginAndBindStudent(userID int, stuID, plainPassword string) error {
 		}
 		log.Println("🤖 AI识别验证码为：", valCode)
 
-		loginResult, err := schoollogin.Login(stuID, plainPassword, valCode, preLoginCookies)
-		if err != nil {
-			fmt.Println("⚠️ 登录失败:", err)
+		loginResult, _ := schoollogin.Login(stuID, plainPassword, valCode, preLoginCookies)
+		if loginResult == nil {
+			return fmt.Errorf("登录失败: 无返回结果")
+		}
 
-			if strings.Contains(err.Error(), "验证码") || strings.Contains(err.Error(), "ValCode") {
-				lastErr = err
+		// ✅ 处理微学工平台提示（初始密码需修改）
+		if !loginResult.Response.IsOk {
+			if loginResult.Response.G != "" {
+				return &LoginFailWithG{
+					Err: fmt.Errorf("登录失败: 微学工平台提示信息: %s", loginResult.Response.Message),
+					G:   loginResult.Response.G,
+				}
+			}
+
+			// 如果提示验证码错误，尝试重试
+			if strings.Contains(loginResult.Response.Message, "验证码") || strings.Contains(loginResult.Response.Message, "ValCode") {
+				lastErr = fmt.Errorf("登录失败: %s", loginResult.Response.Message)
 				continue
 			}
-			return fmt.Errorf("登录失败: %v", err)
+
+			// 其它失败直接返回
+			return fmt.Errorf("登录失败: %s", loginResult.Response.Message)
 		}
 
 		studentName, err := schoollogin.GetStudentNameFromDetail(loginResult.Cookies)
@@ -98,7 +121,8 @@ func LoginAndBindStudent(userID int, stuID, plainPassword string) error {
 	return fmt.Errorf("多次尝试登录均失败: %v", lastErr)
 }
 
-// LoginWithoutBind 仅用于登录获取 cookies，不进行绑定
+
+// LoginWithoutBind 仅用于登录获取 cookies，不进行绑定 
 func LoginWithoutBind(stuID, plainPassword string) ([]*http.Cookie, error) {
 	var lastErr error
 
@@ -124,6 +148,12 @@ func LoginWithoutBind(stuID, plainPassword string) ([]*http.Cookie, error) {
 				continue
 			}
 			return nil, fmt.Errorf("登录失败: %v", err)
+		}
+
+		// 🚨 核心防护：cookies 为空也算失败
+		if loginResult == nil || loginResult.Cookies == nil || len(loginResult.Cookies) == 0 {
+			lastErr = fmt.Errorf("登录成功但未获取到 cookies")
+			continue
 		}
 
 		return loginResult.Cookies, nil

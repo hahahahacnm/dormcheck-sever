@@ -1,10 +1,8 @@
-// logic/schoollogin/login.go
 package schoollogin
 
 import (
 	"dormcheck/utils"
 	"encoding/json"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -12,14 +10,13 @@ import (
 	"strings"
 )
 
-// LoginResponse 代表登录接口响应的数据结构（可根据实际API调整）
+// LoginResponse 代表登录接口响应的数据结构
 type LoginResponse struct {
-	Code    int    `json:"code"`
-	Message string `json:"msg"`
-	IsOk    bool   `json:"isok"`
-	Data    struct {
-		//这里是登录接口可能返回的其他变量，可以在这里存储
-	} `json:"data"`
+	Code    int             `json:"code"`
+	Message string          `json:"msg"`
+	IsOk    bool            `json:"isok"`
+	Data    json.RawMessage `json:"data"`
+	G       string          `json:"g"`
 }
 
 // LoginResult 封装登录成功后的关键信息
@@ -30,17 +27,17 @@ type LoginResult struct {
 
 // Login 进行登录，返回封装好的登录结果和错误
 func Login(username, password, valCode string, preCookies []*http.Cookie) (*LoginResult, error) {
-	// 1. RSA 加密用户名和密码
 	encUser, err := utils.EncryptWithRSA(username)
 	if err != nil {
-		return nil, fmt.Errorf("加密用户名失败: %v", err)
+		log.Println("加密用户名失败:", err)
+		return nil, err
 	}
 	encPass, err := utils.EncryptWithRSA(password)
 	if err != nil {
-		return nil, fmt.Errorf("加密密码失败: %v", err)
+		log.Println("加密密码失败:", err)
+		return nil, err
 	}
 
-	// 2. 使用 url.Values 构造登录请求体（表单格式）
 	form := url.Values{
 		"LoginType":     {"0"},
 		"UserName":      {encUser},
@@ -50,13 +47,12 @@ func Login(username, password, valCode string, preCookies []*http.Cookie) (*Logi
 		"IsShowValCode": {"true"},
 	}
 
-	// 3. 创建请求
 	req, err := http.NewRequest("POST", "http://plat.swmu.edu.cn/MyAuthentication/put/", strings.NewReader(form.Encode()))
 	if err != nil {
-		return nil, fmt.Errorf("创建请求失败: %v", err)
+		log.Println("创建请求失败:", err)
+		return nil, err
 	}
 
-	// 4. 添加请求头和 cookie
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	var cookieStrings []string
 	for _, ck := range preCookies {
@@ -65,38 +61,45 @@ func Login(username, password, valCode string, preCookies []*http.Cookie) (*Logi
 		}
 	}
 	if len(cookieStrings) > 0 {
-		cookieHeader := strings.Join(cookieStrings, "; ")
-		req.Header.Set("Cookie", cookieHeader)
+		req.Header.Set("Cookie", strings.Join(cookieStrings, "; "))
 	}
 
-	// 5. 发起请求
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("请求发送失败: %v", err)
+		log.Println("请求发送失败:", err)
+		return nil, err
 	}
 	defer resp.Body.Close()
 
-	// 6. 读取响应
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("读取响应失败: %v", err)
+		log.Println("读取响应失败:", err)
+		return nil, err
 	}
-	// 🐞 打印响应内容
 	log.Println("获取登录响应:", string(bodyBytes))
 
-	// 7. 解析返回 JSON
 	var loginResp LoginResponse
 	if err := json.Unmarshal(bodyBytes, &loginResp); err != nil {
-		return nil, fmt.Errorf("解析响应体失败: %v", err)
+		log.Println("解析响应体失败:", err)
+		return nil, err
 	}
 
-	// 8. 登录失败检查
+	// 登录失败但 g 有效
+	if !loginResp.IsOk && strings.TrimSpace(loginResp.G) != "" {
+		gBytes, _ := json.Marshal(map[string]string{"g": loginResp.G})
+		loginResp.Data = gBytes
+		log.Println("微学工平台提示信息:", loginResp.Message)
+		return &LoginResult{Response: &loginResp}, nil // ✅ 返回 nil 错误
+	}
+
+	// 登录失败且无 g
 	if !loginResp.IsOk {
-		return &LoginResult{Response: &loginResp}, fmt.Errorf("微学工平台提示信息: %s", loginResp.Message)
+		log.Println("微学工平台提示信息:", loginResp.Message)
+		return &LoginResult{Response: &loginResp}, nil
 	}
 
-	// 9. 提取 Cookies
+	// 提取 ct_vali cookie
 	var ctVali string
 	ctValiCount := 0
 	for _, setCookie := range resp.Header["Set-Cookie"] {
@@ -110,19 +113,17 @@ func Login(username, password, valCode string, preCookies []*http.Cookie) (*Logi
 		}
 	}
 
-	// 确保获取到有效的 Cookies
 	if ctVali == "" {
-		return nil, fmt.Errorf("未能获取有效的 ct_vali cookie")
+		log.Println("未能获取有效的 ct_vali cookie")
+		return nil, nil
 	}
 
-	// 10. 构造完整的登录态 Cookies
 	finalCookies := []*http.Cookie{
 		{Name: "qyuserid", Value: username},
 		{Name: "utpstr", Value: "1"},
 		{Name: "ct_vali", Value: ctVali},
 	}
 
-	// 返回封装的登录结果，包括正确的 Cookies
 	return &LoginResult{
 		Response: &loginResp,
 		Cookies:  finalCookies,

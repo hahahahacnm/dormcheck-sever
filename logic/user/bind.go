@@ -40,3 +40,22 @@ func GetBoundStudents(userID int) ([]database.UserStudent, error) {
 	err := database.DB.Where("user_id = ?", userID).Find(&binds).Error
 	return binds, err
 }
+
+// 查询单个学号的密码（仅限用户自己已绑定的学号）
+func GetStudentPassword(userID int, stuID string) (string, error) {
+	db := database.DB
+
+	// 先确认该用户已经绑定了这个学号
+	var bind database.UserStudent
+	if err := db.Where("user_id = ? AND stu_id = ?", userID, stuID).First(&bind).Error; err != nil {
+		return "", errors.New("学号未绑定或不存在")
+	}
+
+	// 查询密码
+	var student database.Student
+	if err := db.Where("stu_id = ?", stuID).First(&student).Error; err != nil {
+		return "", errors.New("学号信息不存在")
+	}
+
+	return student.Password, nil
+}
