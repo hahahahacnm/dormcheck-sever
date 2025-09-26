@@ -13,7 +13,7 @@ func StartWorker() {
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
 
-	lastTaskCount := -1 // 初始化为 -1，确保首次能打印
+	lastTaskCount := -1
 
 	for range ticker.C {
 		tasks, err := GetPendingTasks()
@@ -24,7 +24,6 @@ func StartWorker() {
 
 		currentCount := len(tasks)
 
-		// 🧠 只有任务数量变化时才打印日志
 		if currentCount != lastTaskCount {
 			log.Println("⏰ 自动签到调度器运行中...")
 			if currentCount == 0 {
@@ -37,7 +36,6 @@ func StartWorker() {
 
 		for _, task := range tasks {
 			log.Printf("→ 执行签到任务: StuID=%s, ActivityID=%s", task.StuID, task.ActivityID)
-
 			err := student.ExecuteSignTask(&task)
 			if err != nil {
 				log.Printf("❌ 执行失败: %v", err)
@@ -51,23 +49,21 @@ func StartWorker() {
 // GetPendingTasks 获取所有待签到任务
 func GetPendingTasks() ([]database.Task, error) {
 	now := time.Now()
-	fiveMinutesAgo := now.Add(-5 * time.Minute) // 避免失败任务立即重试
+	currentTime := now.Format("15:04:05")
+	fiveMinutesAgo := now.Add(-5 * time.Minute).Format("2006-01-02 15:04:05")
 
 	var tasks []database.Task
 
 	err := database.DB.
-		Where(
-			`datetime(date('now') || ' ' || sign_time) <= ? AND 
-			 exec_status != ? AND 
-			 retry_count < max_retry AND 
-			 enabled = ? AND 
-			 (executed_at IS NULL OR executed_at <= ?)`,
-			now.Format("2006-01-02 15:04:05"), // 当前时间
-			"success",
-			true,
-			fiveMinutesAgo.Format("2006-01-02 15:04:05"), // 至少间隔5分钟
-		).
+		Where(`
+			enabled = ? AND
+			exec_status != ? AND
+			retry_count < max_retry AND
+			sign_time <= ? AND
+			(executed_at IS NULL OR executed_at <= ?)
+		`, true, "success", currentTime, fiveMinutesAgo).
 		Find(&tasks).Error
 
 	return tasks, err
 }
+
