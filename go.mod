@@ -2,13 +2,12 @@ module dormcheck
 
 go 1.24.4
 
-require gorm.io/driver/sqlite v1.6.0
-
 require (
-	github.com/natefinch/lumberjack v2.0.0+incompatible // indirect
-	gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc // indirect
-	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df // indirect
+	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
+	gorm.io/driver/sqlite v1.6.0
 )
+
+require gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc // indirect
 
 require (
 	github.com/andybalholm/brotli v1.1.0 // indirect

@@ -1,0 +1,135 @@
+2025/09/14 00:05:00 reset_worker.go:34: ✅ 所有任务已于 00:05 重置
+2025/09/14 00:26:31 student.go:33: 收到用户绑定请求: 用户ID=1, 学生ID=20230202330130
+2025/09/14 00:26:31 login.go:47: 🔁 正在进行第 1 次登录尝试...
+2025/09/14 00:26:32 login.go:58: 🤖 AI识别验证码为： 963B
+2025/09/14 00:26:32 login.go:86: 获取登录响应: {"isok":false,"times":1,"isshowvalcode":false,"msg":"用户不存在或密码错误，连续登陆超过3次将被锁定","g":null}
+2025/09/14 00:26:32 student.go:36: 绑定失败，错误信息: 登录失败: 微学工平台提示信息: 用户不存在或密码错误，连续登陆超过3次将被锁定
+2025/09/14 00:49:58 init.go:38: ✅ 数据库连接成功，迁移完成
+2025/09/14 00:49:58 cookie_refresher.go:20: ⚠️ 模拟登录失败: 学号=2025000000, 原因=账号或密码错误（模拟测试）
+2025/09/14 00:50:01 cookie_refresher.go:26: 📧 测试邮件已发送成功: 学号=2025000000, 邮箱=2219911811@qq.com
+2025/09/14 00:55:21 init.go:38: ✅ 数据库连接成功，迁移完成
+2025/09/14 00:55:37 student.go:33: 收到用户绑定请求: 用户ID=1, 学生ID=3123123
+2025/09/14 00:55:37 login.go:47: 🔁 正在进行第 1 次登录尝试...
+2025/09/14 00:55:37 login.go:58: 🤖 AI识别验证码为： 9JTZ
+2025/09/14 00:55:37 login.go:86: 获取登录响应: {"isok":false,"times":1,"isshowvalcode":false,"msg":"用户不存在或密码错误，连续登陆超过3次将被锁定","g":null}
+2025/09/14 00:55:37 student.go:36: 绑定失败，错误信息: 登录失败: 微学工平台提示信息: 用户不存在或密码错误，连续登陆超过3次将被锁定
+2025/09/14 00:56:21 sign_worker.go:28: ⏰ 自动签到调度器运行中...
+2025/09/14 00:56:21 sign_worker.go:30: 📭 当前无待签到任务（检测持续运行中... ...）
+2025/09/14 00:57:18 student.go:33: 收到用户绑定请求: 用户ID=1, 学生ID=20230202332409
+2025/09/14 00:57:18 login.go:47: 🔁 正在进行第 1 次登录尝试...
+2025/09/14 00:57:18 login.go:58: 🤖 AI识别验证码为： 89J8
+2025/09/14 00:57:18 login.go:86: 获取登录响应: {"isok":true,"url":"http://me.swmu.edu.cn","g":""}
+2025/09/14 00:57:22 studentdetail.go:61: ✅ 成功提取 student name：陈俊豪
+2025/09/14 00:57:22 login.go:76: 🎓 获取到学生姓名：陈俊豪
+2025/09/14 00:57:22 operations.go:55: 更新学生信息: 20230202332409
+2025/09/14 00:57:22 operations.go:77: ✅ 该用户已绑定该学生，无需重复绑定
+2025/09/14 23:54:48 init.go:38: ✅ 数据库连接成功，迁移完成
+2025/09/14 23:55:48 sign_worker.go:28: ⏰ 自动签到调度器运行中...
+2025/09/14 23:55:48 sign_worker.go:32: 📌 找到 48 个待签到任务，准备开始执行！
+2025/09/14 23:55:48 sign_worker.go:38: → 执行签到任务: StuID=20230202332409, ActivityID=123
+2025/09/14 23:55:48 sign_worker.go:43: ✅ 执行完成（结果已由任务内部判定）: ActivityID=123
+2025/09/14 23:55:48 sign_worker.go:38: → 执行签到任务: StuID=20230826330414, ActivityID=75
+2025/09/14 23:55:49 sign_worker.go:43: ✅ 执行完成（结果已由任务内部判定）: ActivityID=75
+2025/09/14 23:55:49 sign_worker.go:38: → 执行签到任务: StuID=20230202332411, ActivityID=123
+2025/09/14 23:55:50 sign_worker.go:43: ✅ 执行完成（结果已由任务内部判定）: ActivityID=123
+2025/09/14 23:55:50 sign_worker.go:38: → 执行签到任务: StuID=20230202332224, ActivityID=123
+2025/09/14 23:55:50 sign_worker.go:43: ✅ 执行完成（结果已由任务内部判定）: ActivityID=123
+2025/09/14 23:55:50 sign_worker.go:38: → 执行签到任务: StuID=20230203330107, ActivityID=123
+2025/09/14 23:55:51 sign_worker.go:43: ✅ 执行完成（结果已由任务内部判定）: ActivityID=123
+2025/09/14 23:55:51 sign_worker.go:38: → 执行签到任务: StuID=20230202332427, ActivityID=123
+2025/09/14 23:55:51 sign_worker.go:43: ✅ 执行完成（结果已由任务内部判定）: ActivityID=123
+2025/09/14 23:55:51 sign_worker.go:38: → 执行签到任务: StuID=20230202330315, ActivityID=124
+2025/09/14 23:55:52 sign_worker.go:43: ✅ 执行完成（结果已由任务内部判定）: ActivityID=124
+2025/09/14 23:55:52 sign_worker.go:38: → 执行签到任务: StuID=20230202330113, ActivityID=124
+2025/09/14 23:55:52 sign_worker.go:43: ✅ 执行完成（结果已由任务内部判定）: ActivityID=124
+2025/09/14 23:55:52 sign_worker.go:38: → 执行签到任务: StuID=20230202330104, ActivityID=124
+2025/09/14 23:55:53 sign_worker.go:43: ✅ 执行完成（结果已由任务内部判定）: ActivityID=124
+2025/09/14 23:55:53 sign_worker.go:38: → 执行签到任务: StuID=20230202330418, ActivityID=124
+2025/09/14 23:55:53 sign_worker.go:43: ✅ 执行完成（结果已由任务内部判定）: ActivityID=124
+2025/09/14 23:55:53 sign_worker.go:38: → 执行签到任务: StuID=20230202330109, ActivityID=124
+2025/09/14 23:55:54 sign_worker.go:43: ✅ 执行完成（结果已由任务内部判定）: ActivityID=124
+2025/09/14 23:55:54 sign_worker.go:38: → 执行签到任务: StuID=20230202332413, ActivityID=123
+2025/09/14 23:55:54 sign_worker.go:43: ✅ 执行完成（结果已由任务内部判定）: ActivityID=123
+2025/09/14 23:55:54 sign_worker.go:38: → 执行签到任务: StuID=20230202332426, ActivityID=123
+2025/09/14 23:55:55 sign_worker.go:43: ✅ 执行完成（结果已由任务内部判定）: ActivityID=123
+2025/09/14 23:55:55 sign_worker.go:38: → 执行签到任务: StuID=20230202331626, ActivityID=123
+2025/09/14 23:55:55 sign_worker.go:43: ✅ 执行完成（结果已由任务内部判定）: ActivityID=123
+2025/09/14 23:55:55 sign_worker.go:38: → 执行签到任务: StuID=20230826330120, ActivityID=75
+2025/09/14 23:55:56 sign_worker.go:43: ✅ 执行完成（结果已由任务内部判定）: ActivityID=75
+2025/09/14 23:55:56 sign_worker.go:38: → 执行签到任务: StuID=20230202330409, ActivityID=124
+2025/09/14 23:55:57 sign_worker.go:43: ✅ 执行完成（结果已由任务内部判定）: ActivityID=124
+2025/09/14 23:55:57 sign_worker.go:38: → 执行签到任务: StuID=20230202331728, ActivityID=123
+2025/09/14 23:55:57 sign_worker.go:43: ✅ 执行完成（结果已由任务内部判定）: ActivityID=123
+2025/09/14 23:55:57 sign_worker.go:38: → 执行签到任务: StuID=20230202331716, ActivityID=123
+2025/09/14 23:55:58 sign_worker.go:43: ✅ 执行完成（结果已由任务内部判定）: ActivityID=123
+2025/09/14 23:55:58 sign_worker.go:38: → 执行签到任务: StuID=20230202331303, ActivityID=123
+2025/09/14 23:55:58 sign_worker.go:43: ✅ 执行完成（结果已由任务内部判定）: ActivityID=123
+2025/09/14 23:55:58 sign_worker.go:38: → 执行签到任务: StuID=20230202331402, ActivityID=123
+2025/09/14 23:55:59 sign_worker.go:43: ✅ 执行完成（结果已由任务内部判定）: ActivityID=123
+2025/09/14 23:55:59 sign_worker.go:38: → 执行签到任务: StuID=20230202331630, ActivityID=123
+2025/09/14 23:55:59 sign_worker.go:43: ✅ 执行完成（结果已由任务内部判定）: ActivityID=123
+2025/09/14 23:55:59 sign_worker.go:38: → 执行签到任务: StuID=20230202331718, ActivityID=123
+2025/09/14 23:56:00 sign_worker.go:43: ✅ 执行完成（结果已由任务内部判定）: ActivityID=123
+2025/09/14 23:56:00 sign_worker.go:38: → 执行签到任务: StuID=20230202332307, ActivityID=123
+2025/09/14 23:56:00 sign_worker.go:43: ✅ 执行完成（结果已由任务内部判定）: ActivityID=123
+2025/09/14 23:56:00 sign_worker.go:38: → 执行签到任务: StuID=20230202332003, ActivityID=123
+2025/09/14 23:56:01 sign_worker.go:43: ✅ 执行完成（结果已由任务内部判定）: ActivityID=123
+2025/09/14 23:56:01 sign_worker.go:38: → 执行签到任务: StuID=20230826330404, ActivityID=75
+2025/09/14 23:56:01 sign_worker.go:43: ✅ 执行完成（结果已由任务内部判定）: ActivityID=75
+2025/09/14 23:56:01 sign_worker.go:38: → 执行签到任务: StuID=20230826330410, ActivityID=75
+2025/09/14 23:56:02 sign_worker.go:43: ✅ 执行完成（结果已由任务内部判定）: ActivityID=75
+2025/09/14 23:56:02 sign_worker.go:38: → 执行签到任务: StuID=20230826330423, ActivityID=75
+2025/09/14 23:56:03 sign_worker.go:43: ✅ 执行完成（结果已由任务内部判定）: ActivityID=75
+2025/09/14 23:56:03 sign_worker.go:38: → 执行签到任务: StuID=20230826330425, ActivityID=75
+2025/09/14 23:56:03 sign_worker.go:43: ✅ 执行完成（结果已由任务内部判定）: ActivityID=75
+2025/09/14 23:56:03 sign_worker.go:38: → 执行签到任务: StuID=20230826330415, ActivityID=75
+2025/09/14 23:56:04 sign_worker.go:43: ✅ 执行完成（结果已由任务内部判定）: ActivityID=75
+2025/09/14 23:56:04 sign_worker.go:38: → 执行签到任务: StuID=20230826330422, ActivityID=75
+2025/09/14 23:56:04 sign_worker.go:43: ✅ 执行完成（结果已由任务内部判定）: ActivityID=75
+2025/09/14 23:56:04 sign_worker.go:38: → 执行签到任务: StuID=20230826330428, ActivityID=75
+2025/09/14 23:56:05 sign_worker.go:43: ✅ 执行完成（结果已由任务内部判定）: ActivityID=75
+2025/09/14 23:56:05 sign_worker.go:38: → 执行签到任务: StuID=20230202330407, ActivityID=124
+2025/09/14 23:56:05 sign_worker.go:43: ✅ 执行完成（结果已由任务内部判定）: ActivityID=124
+2025/09/14 23:56:05 sign_worker.go:38: → 执行签到任务: StuID=20230140330102, ActivityID=4
+2025/09/14 23:56:06 sign_worker.go:43: ✅ 执行完成（结果已由任务内部判定）: ActivityID=4
+2025/09/14 23:56:06 sign_worker.go:38: → 执行签到任务: StuID=20230202330406, ActivityID=124
+2025/09/14 23:56:06 sign_worker.go:43: ✅ 执行完成（结果已由任务内部判定）: ActivityID=124
+2025/09/14 23:56:06 sign_worker.go:38: → 执行签到任务: StuID=20230202330130, ActivityID=124
+2025/09/14 23:56:07 sign_worker.go:43: ✅ 执行完成（结果已由任务内部判定）: ActivityID=124
+2025/09/14 23:56:07 sign_worker.go:38: → 执行签到任务: StuID=20230202332320, ActivityID=123
+2025/09/14 23:56:07 sign_worker.go:43: ✅ 执行完成（结果已由任务内部判定）: ActivityID=123
+2025/09/14 23:56:07 sign_worker.go:38: → 执行签到任务: StuID=20230202332326, ActivityID=123
+2025/09/14 23:56:08 sign_worker.go:43: ✅ 执行完成（结果已由任务内部判定）: ActivityID=123
+2025/09/14 23:56:08 sign_worker.go:38: → 执行签到任务: StuID=20220544330106, ActivityID=128
+2025/09/14 23:56:08 sign_worker.go:43: ✅ 执行完成（结果已由任务内部判定）: ActivityID=128
+2025/09/14 23:56:08 sign_worker.go:38: → 执行签到任务: StuID=20220202332402, ActivityID=128
+2025/09/14 23:56:09 sign_worker.go:43: ✅ 执行完成（结果已由任务内部判定）: ActivityID=128
+2025/09/14 23:56:09 sign_worker.go:38: → 执行签到任务: StuID=20220202332226, ActivityID=128
+2025/09/14 23:56:10 sign_worker.go:43: ✅ 执行完成（结果已由任务内部判定）: ActivityID=128
+2025/09/14 23:56:10 sign_worker.go:38: → 执行签到任务: StuID=20240619330325, ActivityID=4
+2025/09/14 23:56:10 sign_worker.go:43: ✅ 执行完成（结果已由任务内部判定）: ActivityID=4
+2025/09/14 23:56:10 sign_worker.go:38: → 执行签到任务: StuID=20230202331714, ActivityID=123
+2025/09/14 23:56:11 sign_worker.go:43: ✅ 执行完成（结果已由任务内部判定）: ActivityID=123
+2025/09/14 23:56:11 sign_worker.go:38: → 执行签到任务: StuID=20230202331710, ActivityID=123
+2025/09/14 23:56:11 sign_worker.go:43: ✅ 执行完成（结果已由任务内部判定）: ActivityID=123
+2025/09/14 23:56:11 sign_worker.go:38: → 执行签到任务: StuID=20250314330118, ActivityID=125
+2025/09/14 23:56:12 sign_worker.go:43: ✅ 执行完成（结果已由任务内部判定）: ActivityID=125
+2025/09/14 23:56:12 sign_worker.go:38: → 执行签到任务: StuID=20231605330518, ActivityID=121
+2025/09/14 23:56:12 sign_worker.go:41: ❌ 执行失败: 今天无签到任务
+2025/09/14 23:56:12 sign_worker.go:38: → 执行签到任务: StuID=20240516330115, ActivityID=72
+2025/09/14 23:56:13 sign_worker.go:43: ✅ 执行完成（结果已由任务内部判定）: ActivityID=72
+2025/09/14 23:56:13 sign_worker.go:38: → 执行签到任务: StuID=20240314330420, ActivityID=72
+2025/09/14 23:56:13 sign_worker.go:43: ✅ 执行完成（结果已由任务内部判定）: ActivityID=72
+2025/09/14 23:56:13 sign_worker.go:38: → 执行签到任务: StuID=20230202332415, ActivityID=123
+2025/09/14 23:56:14 sign_worker.go:43: ✅ 执行完成（结果已由任务内部判定）: ActivityID=123
+2025/09/14 23:56:48 sign_worker.go:28: ⏰ 自动签到调度器运行中...
+2025/09/14 23:56:48 sign_worker.go:30: 📭 当前无待签到任务（检测持续运行中... ...）
+2025/09/14 23:59:14 student.go:33: 收到用户绑定请求: 用户ID=1, 学生ID=20230202332409
+2025/09/14 23:59:14 login.go:57: 🔁 正在进行第 1 次登录尝试...
+2025/09/14 23:59:15 login.go:68: 🤖 AI识别验证码为： 276V
+2025/09/14 23:59:15 login.go:86: 获取登录响应: {"isok":false,"times":1,"isshowvalcode":false,"msg":"密码过于简单，需要修改登陆密码！","g":"c127b4b74fca4e0faecad3582867346e"}
+2025/09/14 23:59:15 login.go:102: 微学工平台提示信息: 密码过于简单，需要修改登陆密码！
+2025/09/14 23:59:15 studentdetail.go:56: ⚠️ 未能在页面中提取 userName。可能是 Cookie 失效。
+2025/09/14 23:59:15 login.go:91: ⚠️ 获取学生姓名失败，将使用空值。 无法从页面中解析出 userName
+2025/09/14 23:59:15 operations.go:55: 更新学生信息: 20230202332409
+2025/09/14 23:59:15 operations.go:77: ✅ 该用户已绑定该学生，无需重复绑定

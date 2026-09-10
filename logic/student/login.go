@@ -14,8 +14,8 @@ import (
 
 // LoginFailWithG 封装登录失败信息和 g 值
 type LoginFailWithG struct {
-	Err error   // 原始错误信息
-	G   string  // 初始密码修改标识
+	Err error  // 原始错误信息
+	G   string // 初始密码修改标识
 }
 
 func (e *LoginFailWithG) Error() string {
@@ -121,15 +121,14 @@ func LoginAndBindStudent(userID int, stuID, plainPassword string) error {
 	return fmt.Errorf("多次尝试登录均失败: %v", lastErr)
 }
 
-
-// LoginWithoutBind 仅用于登录获取 cookies，不进行绑定 
+// LoginWithoutBind 仅用于登录获取 cookies，不进行绑定
 func LoginWithoutBind(stuID, plainPassword string) ([]*http.Cookie, error) {
 	var lastErr error
 
 	for i := 1; i <= 3; i++ {
 		log.Printf("🔁 第 %d 次尝试登录学号 %s...\n", i, stuID)
 
-		// 获取验证码图像
+		// 每次重试都必须重新获取验证码和预登录 cookies
 		base64Img, preCookies, err := schoollogin.GetValidateCodeBase64()
 		if err != nil {
 			return nil, fmt.Errorf("获取验证码失败: %v", err)
@@ -137,22 +136,33 @@ func LoginWithoutBind(stuID, plainPassword string) ([]*http.Cookie, error) {
 
 		valCode, err := utils.RecognizeCaptcha(base64Img)
 		if err != nil {
-			return nil, fmt.Errorf("验证码识别失败: %v", err)
+			lastErr = fmt.Errorf("验证码识别代码层失败: %v", err)
+			continue
 		}
 
-		// 登录请求
 		loginResult, err := schoollogin.Login(stuID, plainPassword, valCode, preCookies)
 		if err != nil {
+			// 如果平台提示验证码问题，则再试
 			if strings.Contains(err.Error(), "验证码") {
 				lastErr = err
+				log.Printf("⚠️ 第 %d 次登录验证码错误，重新识别中...\n", i)
 				continue
 			}
 			return nil, fmt.Errorf("登录失败: %v", err)
 		}
 
-		// 🚨 核心防护：cookies 为空也算失败
-		if loginResult == nil || loginResult.Cookies == nil || len(loginResult.Cookies) == 0 {
-			lastErr = fmt.Errorf("登录成功但未获取到 cookies")
+		// 核心修复：检测平台提示信息是否为验证码错误
+		if loginResult == nil || !loginResult.Response.IsOk {
+			if strings.Contains(loginResult.Response.Message, "验证码") {
+				lastErr = fmt.Errorf("登录失败: %s", loginResult.Response.Message)
+				log.Printf("⚠️ 第 %d 次登录验证码错误，重新识别中...\n", i)
+				continue
+			}
+			return nil, fmt.Errorf("登录失败: %s", loginResult.Response.Message)
+		}
+
+		if len(loginResult.Cookies) == 0 {
+			lastErr = fmt.Errorf("登录失败: cookies 未获取到")
 			continue
 		}
 

@@ -7,11 +7,13 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+
+	"html" // ✅ 用于 HTML 实体解码
 )
 
-// GetStudentNameFromDetail 使用已登录的 cookies 请求学生详情页，从 HTML 中提取 userName
+// GetStudentNameFromDetail 使用已登录 cookies 从新首页提取学生姓名
 func GetStudentNameFromDetail(cookies []*http.Cookie) (string, error) {
-	url := "http://me.swmu.edu.cn/studentwork/StudentManager/Detail"
+	url := "http://me.swmu.edu.cn/"
 
 	// 构建请求
 	req, err := http.NewRequest("GET", url, nil)
@@ -19,19 +21,19 @@ func GetStudentNameFromDetail(cookies []*http.Cookie) (string, error) {
 		return "", err
 	}
 
-	// 设置请求头
+	// 请求头
 	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
 	req.Header.Set("Accept-Language", "zh-CN,zh;q=0.9")
 
-	// 手动拼接 Cookie 头
+	// 拼接 Cookie
 	var cookieStr string
 	for _, ck := range cookies {
 		cookieStr += ck.Name + "=" + ck.Value + "; "
 	}
 	req.Header.Set("Cookie", strings.TrimSpace(cookieStr))
 
-	// 发起请求
+	// 发送请求
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -44,21 +46,23 @@ func GetStudentNameFromDetail(cookies []*http.Cookie) (string, error) {
 		return "", err
 	}
 
-	html := string(body)
+	htmlText := string(body)
 
-	// debug 打印返回内容（可注释掉）
-	// log.Println("学生详情页面返回 HTML：\n", html)
+	// ✅ 精准匹配第一个 usename 里的第一个 span（姓名）
+	re := regexp.MustCompile(
+		`<div\s+class="usename">\s*<span>(.*?)</span>\s*<span>【.*?】</span>`,
+	)
 
-	// 正则匹配 userName
-	re := regexp.MustCompile(`var\s+userName\s*=\s*'([^']+)'`)
-	matches := re.FindStringSubmatch(html)
+	matches := re.FindStringSubmatch(htmlText)
 	if len(matches) < 2 {
-		log.Println("⚠️ 未能在页面中提取 userName。可能是 Cookie 失效。")
-		return "", errors.New("无法从页面中解析出 userName")
+		log.Println("⚠️ 未能从新首页中提取学生姓名，Cookie 可能失效")
+		return "", errors.New("无法从新页面中解析出 student name")
 	}
 
-	name := strings.TrimSpace(matches[1])
-	log.Printf("✅ 成功提取 student name：%s\n", name)
+	// ✅ HTML 实体解码（&#x9648; → 陈）
+	rawName := strings.TrimSpace(matches[1])
+	name := html.UnescapeString(rawName)
 
+	log.Printf("✅ 成功提取 student name：%s\n", name)
 	return name, nil
 }

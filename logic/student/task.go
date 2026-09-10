@@ -10,7 +10,6 @@ import (
 )
 
 // SaveTask 尝试保存签到任务，重复可更新
-// SaveTask 尝试保存签到任务，重复可更新
 func SaveTask(task *database.Task) error {
 	// 查找是否存在同 user_id、stu_id、activity_id 的任务
 	var existing database.Task
@@ -50,4 +49,46 @@ func SaveTask(task *database.Task) error {
 	existing.ExecutedAt = time.Time{}
 
 	return database.DB.Save(&existing).Error
+}
+
+func UpdateTask(taskID uint, userID int, updates *database.Task) (*database.Task, error) {
+	var existing database.Task
+	if err := database.DB.First(&existing, taskID).Error; err != nil {
+		return nil, err
+	}
+
+	if existing.UserID != userID {
+		return nil, errors.New("permission denied")
+	}
+
+	existing.Address = updates.Address
+	existing.Longitude = updates.Longitude
+	existing.Latitude = updates.Latitude
+	existing.SignTime = updates.SignTime
+	existing.MaxRetry = updates.MaxRetry
+	existing.NotifyEmail = updates.NotifyEmail
+
+	if updates.StuID != "" {
+		existing.StuID = updates.StuID
+	}
+	if updates.ActivityID != "" {
+		existing.ActivityID = updates.ActivityID
+	}
+	if updates.Name != "" {
+		existing.Name = updates.Name
+	}
+	if updates.ActivityName != "" {
+		existing.ActivityName = updates.ActivityName
+	}
+
+	existing.ExecStatus = "pending"
+	existing.RetryCount = 0
+	existing.LastError = ""
+	existing.ExecutedAt = time.Time{}
+
+	if err := database.DB.Save(&existing).Error; err != nil {
+		return nil, err
+	}
+
+	return &existing, nil
 }

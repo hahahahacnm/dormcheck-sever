@@ -38,7 +38,7 @@ func main() {
 		return c.SendString("DormCheck 后端服务已启动！")
 	})
 
-	if err := app.Listen(":8080"); err != nil {
+	if err := app.Listen(":8081"); err != nil {
 		log.Fatal(err)
 	}
 	fmt.Println("✅ DormCheck 启动成功")

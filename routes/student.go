@@ -32,9 +32,24 @@ func RegisterStudentRoutes(app *fiber.App) {
 
 		log.Printf("收到用户绑定请求: 用户ID=%d, 学生ID=%s", userID, data.StuID)
 
-		if err := student.LoginAndBindStudent(userID, data.StuID, data.Password); err != nil {
+		err := student.LoginAndBindStudent(userID, data.StuID, data.Password)
+		if err != nil {
 			log.Printf("绑定失败，错误信息: %v", err)
-			return utils.RespondJSON(c, 400, false, "绑定失败: "+err.Error(), nil)
+
+			// 尝试获取 g 值（只有特定登录失败情况有）
+			var gValue string
+			if le, ok := err.(*student.LoginFailWithG); ok {
+				gValue = le.G
+			}
+
+			respData := map[string]string{}
+			if gValue != "" {
+				respData["g"] = gValue
+			} else {
+				respData = nil
+			}
+
+			return utils.RespondJSON(c, 400, false, "绑定失败: "+err.Error(), respData)
 		}
 
 		return utils.RespondJSON(c, 200, true, "绑定成功", nil)
@@ -77,6 +92,28 @@ func RegisterStudentRoutes(app *fiber.App) {
 		}
 
 		return utils.RespondJSON(c, 200, true, "查询成功", binds)
+	})
+
+	// 查询单个已绑定学生的密码
+	studentGroup.Get("/password/:stu_id", func(c *fiber.Ctx) error {
+		userID := c.Locals("userID").(int)
+		stuID := c.Params("stu_id")
+
+		if stuID == "" {
+			return utils.RespondJSON(c, 400, false, "参数错误，stu_id 不能为空", nil)
+		}
+
+		// 查询密码（仅限用户自己已绑定的学号）
+		pwd, err := user.GetStudentPassword(userID, stuID)
+		if err != nil {
+			return utils.RespondJSON(c, 400, false, "查询失败: "+err.Error(), nil)
+		}
+
+		// 返回学号与密码
+		return utils.RespondJSON(c, 200, true, "查询成功", fiber.Map{
+			"stu_id":   stuID,
+			"password": pwd,
+		})
 	})
 
 	// 从微学工查询指定学生的签到活动列表
@@ -171,6 +208,58 @@ func RegisterStudentRoutes(app *fiber.App) {
 		return utils.RespondJSON(c, 200, true, "任务删除成功", nil)
 	})
 
+	// 修改指定签到任务
+	studentGroup.Post("/task/update", func(c *fiber.Ctx) error {
+		userID := c.Locals("userID").(int)
+
+		var data struct {
+			TaskID       uint    `json:"task_id"`
+			StuID        string  `json:"stu_id"`
+			ActivityID   string  `json:"activity_id"`
+			Name         string  `json:"name"`
+			ActivityName string  `json:"activity_name"`
+			Address      string  `json:"address"`
+			Longitude    float64 `json:"longitude"`
+			Latitude     float64 `json:"latitude"`
+			SignTime     string  `json:"sign_time"`
+			MaxRetry     int     `json:"max_retry"`
+			NotifyEmail  string  `json:"notify_email"`
+		}
+
+		if err := c.BodyParser(&data); err != nil || data.TaskID == 0 {
+			return utils.RespondJSON(c, 400, false, "参数错误，task_id 不能为空", nil)
+		}
+
+		if data.Address == "" || data.SignTime == "" || data.Longitude == 0 || data.Latitude == 0 {
+			return utils.RespondJSON(c, 400, false, "参数错误，请填写完整的任务信息", nil)
+		}
+
+		if _, err := time.Parse("15:04", data.SignTime); err != nil {
+			return utils.RespondJSON(c, 400, false, "签到时间格式错误，应为 HH:mm", nil)
+		}
+
+		updated, err := student.UpdateTask(data.TaskID, userID, &database.Task{
+			StuID:        data.StuID,
+			ActivityID:   data.ActivityID,
+			Name:         data.Name,
+			ActivityName: data.ActivityName,
+			Address:      data.Address,
+			Longitude:    data.Longitude,
+			Latitude:     data.Latitude,
+			SignTime:     data.SignTime,
+			MaxRetry:     data.MaxRetry,
+			NotifyEmail:  data.NotifyEmail,
+		})
+		if err != nil {
+			if err.Error() == "permission denied" {
+				return utils.RespondJSON(c, 403, false, "当前用户没有权限修改该任务", nil)
+			}
+			return utils.RespondJSON(c, 400, false, "更新失败: "+err.Error(), nil)
+		}
+
+		return utils.RespondJSON(c, 200, true, "任务更新成功", updated)
+	})
+
 	// 查询当前用户的所有签到任务
 	studentGroup.Get("/tasks", func(c *fiber.Ctx) error {
 		userID := c.Locals("userID").(int)
@@ -181,6 +270,44 @@ func RegisterStudentRoutes(app *fiber.App) {
 		}
 
 		return utils.RespondJSON(c, 200, true, "查询成功", tasks)
+	})
+
+	// 暂停/恢复任务
+	studentGroup.Post("/task/toggle", func(c *fiber.Ctx) error {
+		userID := c.Locals("userID").(int)
+
+		var data struct {
+			TaskID  uint `json:"task_id"`
+			Enabled bool `json:"enabled"` // true=启用，false=暂停
+		}
+		if err := c.BodyParser(&data); err != nil || data.TaskID == 0 {
+			return utils.RespondJSON(c, 400, false, "参数错误，task_id 不能为空", nil)
+		}
+
+		var task database.Task
+		if err := database.DB.First(&task, data.TaskID).Error; err != nil {
+			return utils.RespondJSON(c, 404, false, "任务不存在", nil)
+		}
+
+		// 确保只能修改自己的任务
+		if task.UserID != userID {
+			return utils.RespondJSON(c, 403, false, "当前用户不具备操作该任务的权限！", nil)
+		}
+
+		task.Enabled = data.Enabled
+		if err := database.DB.Save(&task).Error; err != nil {
+			return utils.RespondJSON(c, 500, false, "更新失败: "+err.Error(), nil)
+		}
+
+		action := "暂停"
+		if data.Enabled {
+			action = "恢复"
+		}
+
+		// ✅ 返回任务ID在data里
+		return utils.RespondJSON(c, 200, true, "任务已"+action, map[string]uint{
+			"task_id": task.ID,
+		})
 	})
 
 }

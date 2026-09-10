@@ -67,7 +67,6 @@ func StartCookieRefresher() {
 					// 有绑定用户 → 必发邮件
 					var userStudents []database.UserStudent
 					if e := database.DB.Where("stu_id = ?", stu.StuID).Find(&userStudents).Error; e == nil {
-						log.Printf("🔍 调试: 学号=%s 查到绑定用户数=%d", stu.StuID, len(userStudents))
 						for _, us := range userStudents {
 							var user database.User
 							if e := database.DB.First(&user, us.UserID).Error; e != nil {
