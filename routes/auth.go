@@ -1,11 +1,32 @@
 package routes
 
 import (
+	"dormcheck/config"
+	"dormcheck/database"
 	"dormcheck/logic/user"
 	"dormcheck/middleware"
+	"strings"
+	"time"
+	"unicode/utf8"
 
 	"github.com/gofiber/fiber/v2"
 )
+
+func authAttemptKey(c *fiber.Ctx) string {
+	var input struct {
+		Username string `json:"username"`
+		Email    string `json:"email"`
+	}
+	_ = c.BodyParser(&input)
+	identifier := strings.ToLower(strings.TrimSpace(input.Username))
+	if identifier == "" {
+		identifier = strings.ToLower(strings.TrimSpace(input.Email))
+	}
+	if len(identifier) > 128 {
+		identifier = identifier[:128]
+	}
+	return c.IP() + ":" + identifier
+}
 
 func RegisterAuthRoutes(app *fiber.App) {
 	auth := app.Group("/auth")
@@ -59,8 +80,8 @@ func RegisterAuthRoutes(app *fiber.App) {
 			return c.Status(400).JSON(fiber.Map{"error": "用户名、邮箱、密码和验证码不能为空"})
 		}
 
-		if len(data.Username) < 3 || len(data.Password) < 6 {
-			return c.Status(400).JSON(fiber.Map{"error": "用户名至少3个字符，密码至少6个字符"})
+		if utf8.RuneCountInString(data.Username) < config.GetInt("username_min_length", 3) || utf8.RuneCountInString(data.Password) < config.GetInt("password_min_length", 6) {
+			return c.Status(400).JSON(fiber.Map{"error": "用户名或密码长度未达到平台要求"})
 		}
 
 		if err := user.Register(data.Username, data.Email, data.Password, data.Code); err != nil {
@@ -71,7 +92,7 @@ func RegisterAuthRoutes(app *fiber.App) {
 	})
 
 	// 登录
-	auth.Post("/login", func(c *fiber.Ctx) error {
+	auth.Post("/login", middleware.RateLimit(20, 15*time.Minute, authAttemptKey), func(c *fiber.Ctx) error {
 		var data struct {
 			Identifier string `json:"username"` // 用户名或邮箱，前端字段仍用 username
 			Password   string `json:"password"`
@@ -93,7 +114,7 @@ func RegisterAuthRoutes(app *fiber.App) {
 	})
 
 	// 忘记密码重置接口（重置后强制下线）
-	auth.Post("/reset-password", func(c *fiber.Ctx) error {
+	auth.Post("/reset-password", middleware.RateLimit(10, 15*time.Minute, authAttemptKey), func(c *fiber.Ctx) error {
 		var data struct {
 			Email       string `json:"email"`
 			Code        string `json:"code"`
@@ -134,10 +155,14 @@ func RegisterAuthRoutes(app *fiber.App) {
 		}
 
 		return c.JSON(fiber.Map{
-			"id":       u.ID,
-			"username": u.Username,
-			"role":     u.Role,
-			"email":    u.Email,
+			"id":             u.ID,
+			"username":       u.Username,
+			"role":           u.Role,
+			"email":          u.Email,
+			"banned":         database.IsUserBanActive(*u, time.Now()),
+			"ban_reason":     u.BanReason,
+			"banned_at":      u.BannedAt,
+			"ban_expires_at": u.BanExpiresAt,
 		})
 	})
 
@@ -161,6 +186,9 @@ func RegisterAuthRoutes(app *fiber.App) {
 		if !user.CheckPasswordHash(body.OldPassword, u.Password) {
 			return c.Status(400).JSON(fiber.Map{"message": "原密码错误"})
 		}
+		if utf8.RuneCountInString(body.NewPassword) < config.GetInt("password_min_length", 6) {
+			return c.Status(400).JSON(fiber.Map{"message": "新密码长度未达到平台要求"})
+		}
 
 		newHash, err := user.HashPassword(body.NewPassword)
 		if err != nil {
@@ -169,12 +197,6 @@ func RegisterAuthRoutes(app *fiber.App) {
 
 		if err := user.UpdateUserPassword(u.ID, newHash); err != nil {
 			return c.Status(500).JSON(fiber.Map{"message": "密码更新失败"})
-		}
-
-		// ✅ 修改密码后强制所有设备下线
-		if err := user.ForceLogoutAll(u.ID); err != nil {
-			// 这里建议只打印日志，不中断流程
-			// log.Warnf("用户 %d 修改密码后强制登出失败: %v", u.ID, err)
 		}
 
 		return c.JSON(fiber.Map{"message": "密码修改成功，已强制下线所有设备，请重新登录"})
@@ -197,7 +219,7 @@ func RegisterAuthRoutes(app *fiber.App) {
 			return c.Status(400).JSON(fiber.Map{"message": err.Error()})
 		}
 
-		return c.JSON(fiber.Map{"message": "邮箱修改成功，请验证新邮箱"})
+		return c.JSON(fiber.Map{"message": "邮箱修改成功，新邮箱已验证"})
 	})
 
 	auth.Post("/send-change-email-code", func(c *fiber.Ctx) error {

@@ -3,7 +3,6 @@ package schoollogin
 import (
 	"dormcheck/utils"
 	"encoding/json"
-	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -47,13 +46,15 @@ func Login(username, password, valCode string, preCookies []*http.Cookie) (*Logi
 		"IsShowValCode": {"true"},
 	}
 
-	req, err := http.NewRequest("POST", "http://plat.swmu.edu.cn/MyAuthentication/put/", strings.NewReader(form.Encode()))
+	req, err := http.NewRequest("POST", LoginURL, strings.NewReader(form.Encode()))
 	if err != nil {
 		log.Println("创建请求失败:", err)
 		return nil, err
 	}
 
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Origin", PlatBaseURL)
+	req.Header.Set("Referer", PlatBaseURL+"/Authentication/")
 	var cookieStrings []string
 	for _, ck := range preCookies {
 		if ck.Name == "Vlis" || ck.Name == "VK_" {
@@ -64,21 +65,17 @@ func Login(username, password, valCode string, preCookies []*http.Cookie) (*Logi
 		req.Header.Set("Cookie", strings.Join(cookieStrings, "; "))
 	}
 
-	client := &http.Client{}
+	client := newSchoolClient()
 	resp, err := client.Do(req)
 	if err != nil {
 		log.Println("请求发送失败:", err)
 		return nil, err
 	}
-	defer resp.Body.Close()
-
-	bodyBytes, err := io.ReadAll(resp.Body)
+	bodyBytes, err := readPlatformResponse(resp)
 	if err != nil {
 		log.Println("读取响应失败:", err)
 		return nil, err
 	}
-	log.Println("获取登录响应:", string(bodyBytes))
-
 	var loginResp LoginResponse
 	if err := json.Unmarshal(bodyBytes, &loginResp); err != nil {
 		log.Println("解析响应体失败:", err)
@@ -101,17 +98,17 @@ func Login(username, password, valCode string, preCookies []*http.Cookie) (*Logi
 
 	// 提取 ct_vali cookie
 	var ctVali string
-	ctValiCount := 0
+	longestCTVali := ""
 	for _, setCookie := range resp.Header["Set-Cookie"] {
 		if strings.HasPrefix(setCookie, "ct_vali=") {
-			ctValiCount++
-			if ctValiCount == 2 {
-				parts := strings.SplitN(setCookie, ";", 2)
-				ctVali = strings.TrimPrefix(parts[0], "ct_vali=")
-				break
+			parts := strings.SplitN(setCookie, ";", 2)
+			value := strings.TrimPrefix(parts[0], "ct_vali=")
+			if len(value) > len(longestCTVali) {
+				longestCTVali = value
 			}
 		}
 	}
+	ctVali = longestCTVali
 
 	if ctVali == "" {
 		log.Println("未能获取有效的 ct_vali cookie")

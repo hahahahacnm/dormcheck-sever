@@ -1,15 +1,18 @@
 package user
 
 import (
+	"dormcheck/config"
 	"dormcheck/database"
 	"dormcheck/utils"
 	"encoding/base64"
 	"errors"
 	"regexp"
 	"time"
+	"unicode/utf8"
 
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // 解码 Base64 密码
@@ -30,6 +33,12 @@ func Register(username, email, encodedPassword, code string) error {
 	password, err := decodePassword(encodedPassword)
 	if err != nil {
 		return err
+	}
+	if utf8.RuneCountInString(username) < config.GetInt("username_min_length", 3) {
+		return errors.New("用户名长度未达到平台要求")
+	}
+	if utf8.RuneCountInString(password) < config.GetInt("password_min_length", 6) {
+		return errors.New("密码长度未达到平台要求")
 	}
 
 	db := database.DB
@@ -57,7 +66,7 @@ func Register(username, email, encodedPassword, code string) error {
 		EmailVerified: true,
 		Password:      hashed,
 		TokenVersion:  1,
-		Role:          1,
+		Role:          database.RoleUser,
 	}
 
 	if err := db.Create(&newUser).Error; err != nil {
@@ -81,7 +90,7 @@ func SendRegisterVerificationCode(email string) error {
 	var lastCode database.EmailVerificationCode
 	err := db.Where("email = ? AND purpose = ?", email, "register").
 		Order("created_at DESC").First(&lastCode).Error
-	if err == nil && time.Since(lastCode.CreatedAt) < 1*time.Minute {
+	if err == nil && time.Since(lastCode.CreatedAt) < time.Duration(config.GetInt("email_code_resend_seconds", 60))*time.Second {
 		return errors.New("验证码发送过于频繁，请稍后再试")
 	}
 
@@ -98,7 +107,7 @@ func SendRegisterVerificationCode(email string) error {
 		Email:     email,
 		Code:      code,
 		Purpose:   "register",
-		ExpiresAt: time.Now().Add(15 * time.Minute),
+		ExpiresAt: time.Now().Add(time.Duration(config.GetInt("email_code_ttl_minutes", 15)) * time.Minute),
 		CreatedAt: time.Now(),
 	}
 
@@ -126,7 +135,6 @@ func Login(identifier, encodedPassword string) (string, error) {
 	if !utils.CheckPassword(user.Password, password) {
 		return "", errors.New("用户名或密码错误")
 	}
-
 	return utils.GenerateToken(user)
 }
 
@@ -165,7 +173,15 @@ func HashPassword(password string) (string, error) {
 }
 
 func UpdateUserPassword(userID int, newHash string) error {
-	return database.DB.Model(&database.User{}).Where("id = ?", userID).Update("password", newHash).Error
+	result := database.DB.Model(&database.User{}).Where("id = ?", userID).
+		Updates(map[string]interface{}{"password": newHash, "token_version": gorm.Expr("token_version + 1")})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected != 1 {
+		return errors.New("用户不存在")
+	}
+	return nil
 }
 
 // ------------- 修改密码，且限制新密码不能和旧密码相同 -------------
@@ -229,27 +245,24 @@ func ChangeUserEmail(userID int, newEmail, code string) error {
 		return errors.New("新邮箱不能与旧邮箱相同")
 	}
 
-	var evc database.EmailVerificationCode
-	if err := db.Where("email = ? AND code = ? AND purpose = ? AND expires_at > ?", newEmail, code, "change_email", time.Now()).
-		First(&evc).Error; err != nil {
-		return errors.New("验证码错误或已过期")
-	}
-
-	var existing database.User
-	if err := db.Where("email = ?", newEmail).First(&existing).Error; err == nil && existing.ID != userID {
-		return errors.New("该邮箱已被其他用户绑定")
-	}
-
-	if err := db.Model(&database.User{}).Where("id = ?", userID).Updates(map[string]interface{}{
-		"email":          newEmail,
-		"email_verified": false,
-	}).Error; err != nil {
-		return errors.New("更新邮箱失败")
-	}
-
-	_ = db.Delete(&evc).Error
-
-	return nil
+	return db.Transaction(func(tx *gorm.DB) error {
+		var evc database.EmailVerificationCode
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("email = ? AND code = ? AND purpose = ? AND expires_at > ?", newEmail, code, "change_email", time.Now()).
+			First(&evc).Error; err != nil {
+			return errors.New("验证码错误或已过期")
+		}
+		var existing database.User
+		if err := tx.Where("email = ?", newEmail).First(&existing).Error; err == nil && existing.ID != userID {
+			return errors.New("该邮箱已被其他用户绑定")
+		}
+		if err := tx.Model(&database.User{}).Where("id = ?", userID).Updates(map[string]interface{}{
+			"email": newEmail, "email_verified": true,
+		}).Error; err != nil {
+			return errors.New("更新邮箱失败")
+		}
+		return tx.Where("email = ? AND purpose = ?", newEmail, "change_email").Delete(&database.EmailVerificationCode{}).Error
+	})
 }
 
 func SendChangeEmailVerificationCode(email string) error {
@@ -263,7 +276,7 @@ func SendChangeEmailVerificationCode(email string) error {
 	var lastCode database.EmailVerificationCode
 	err := db.Where("email = ? AND purpose = ?", email, "change_email").
 		Order("created_at DESC").First(&lastCode).Error
-	if err == nil && time.Since(lastCode.CreatedAt) < 1*time.Minute {
+	if err == nil && time.Since(lastCode.CreatedAt) < time.Duration(config.GetInt("email_code_resend_seconds", 60))*time.Second {
 		return errors.New("验证码发送过于频繁，请稍后再试")
 	}
 
@@ -280,7 +293,7 @@ func SendChangeEmailVerificationCode(email string) error {
 		Email:     email,
 		Code:      code,
 		Purpose:   "change_email",
-		ExpiresAt: time.Now().Add(15 * time.Minute),
+		ExpiresAt: time.Now().Add(time.Duration(config.GetInt("email_code_ttl_minutes", 15)) * time.Minute),
 		CreatedAt: time.Now(),
 	}
 
@@ -290,36 +303,38 @@ func SendChangeEmailVerificationCode(email string) error {
 // 赞助码激活
 func UseSponsorCode(userID int, code string) error {
 	db := database.DB
-
-	var user database.User
-	if err := db.First(&user, userID).Error; err != nil {
-		return errors.New("用户不存在")
-	}
-	if user.Role == 2 {
-		return errors.New("您已是赞助用户，无需重复激活")
-	}
-
-	var sac database.SponsorActivationCode
-	err := db.Where("code = ? AND used = ?", code, false).First(&sac).Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return errors.New("激活码无效或已被使用")
-		}
-		return err
-	}
-
 	return db.Transaction(func(tx *gorm.DB) error {
+		var current database.User
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&current, userID).Error; err != nil {
+			return errors.New("用户不存在")
+		}
+		if database.IsAdminRole(current.Role) {
+			return errors.New("管理员账号不能使用赞助码变更角色")
+		}
+		if current.Role == database.RoleSponsor {
+			return errors.New("您已是赞助用户，无需重复激活")
+		}
+		var sac database.SponsorActivationCode
+		if err := tx.Where("code = ? AND used = ?", code, false).First(&sac).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return errors.New("激活码无效或已被使用")
+			}
+			return err
+		}
 		now := time.Now()
-
-		if err := tx.Model(&database.SponsorActivationCode{}).Where("id = ?", sac.ID).Updates(map[string]interface{}{
+		result := tx.Model(&database.SponsorActivationCode{}).Where("id = ? AND used = ?", sac.ID, false).Updates(map[string]interface{}{
 			"used":    true,
 			"used_by": userID,
 			"used_at": now,
-		}).Error; err != nil {
-			return err
+		})
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 0 {
+			return errors.New("激活码已被使用")
 		}
 
-		if err := tx.Model(&database.User{}).Where("id = ?", userID).Update("role", 2).Error; err != nil {
+		if err := tx.Model(&database.User{}).Where("id = ?", userID).Update("role", database.RoleSponsor).Error; err != nil {
 			return err
 		}
 
@@ -344,7 +359,7 @@ func SendResetPasswordCode(email string) error {
 	var lastCode database.EmailVerificationCode
 	err := db.Where("email = ? AND purpose = ?", email, "reset").
 		Order("created_at DESC").First(&lastCode).Error
-	if err == nil && time.Since(lastCode.CreatedAt) < time.Minute {
+	if err == nil && time.Since(lastCode.CreatedAt) < time.Duration(config.GetInt("email_code_resend_seconds", 60))*time.Second {
 		return errors.New("验证码发送过于频繁，请稍后再试")
 	}
 
@@ -361,7 +376,7 @@ func SendResetPasswordCode(email string) error {
 		Email:     email,
 		Code:      code,
 		Purpose:   "reset",
-		ExpiresAt: time.Now().Add(15 * time.Minute),
+		ExpiresAt: time.Now().Add(time.Duration(config.GetInt("email_code_ttl_minutes", 15)) * time.Minute),
 		CreatedAt: time.Now(),
 	}
 
@@ -374,17 +389,12 @@ func ResetPasswordByCode(email, code, encodedNewPassword string) error {
 		return errors.New("邮箱、验证码和新密码不能为空")
 	}
 
-	db := database.DB
-
-	var evc database.EmailVerificationCode
-	if err := db.Where("email = ? AND code = ? AND purpose = ? AND expires_at > ?", email, code, "reset", time.Now()).
-		First(&evc).Error; err != nil {
-		return errors.New("验证码错误或已过期")
-	}
-
 	newPassword, err := decodePassword(encodedNewPassword)
 	if err != nil {
 		return err
+	}
+	if utf8.RuneCountInString(newPassword) < config.GetInt("password_min_length", 6) {
+		return errors.New("密码长度未达到平台要求")
 	}
 
 	hashedPwd, err := utils.HashPassword(newPassword)
@@ -392,27 +402,23 @@ func ResetPasswordByCode(email, code, encodedNewPassword string) error {
 		return err
 	}
 
-	if err := db.Model(&database.User{}).Where("email = ?", email).Update("password", hashedPwd).Error; err != nil {
-		return errors.New("密码更新失败")
-	}
-
-	_ = db.Delete(&evc).Error
-
-	return nil
+	return database.DB.Transaction(func(tx *gorm.DB) error {
+		var evc database.EmailVerificationCode
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("email = ? AND code = ? AND purpose = ? AND expires_at > ?", email, code, "reset", time.Now()).
+			First(&evc).Error; err != nil {
+			return errors.New("验证码错误或已过期")
+		}
+		result := tx.Model(&database.User{}).Where("email = ?", email).
+			Updates(map[string]interface{}{"password": hashedPwd, "token_version": gorm.Expr("token_version + 1")})
+		if result.Error != nil || result.RowsAffected != 1 {
+			return errors.New("密码更新失败")
+		}
+		return tx.Where("email = ? AND purpose = ?", email, "reset").Delete(&database.EmailVerificationCode{}).Error
+	})
 }
 
 // 重置密码并强制注销所有设备
 func ResetPasswordAndForceLogout(email, code, encodedNewPassword string) error {
-	if err := ResetPasswordByCode(email, code, encodedNewPassword); err != nil {
-		return err
-	}
-
-	var user database.User
-	if err := database.DB.Where("email = ?", email).First(&user).Error; err != nil {
-		return errors.New("用户不存在")
-	}
-
-	_ = ForceLogoutAll(user.ID)
-
-	return nil
+	return ResetPasswordByCode(email, code, encodedNewPassword)
 }

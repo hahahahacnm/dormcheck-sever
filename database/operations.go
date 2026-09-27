@@ -5,29 +5,16 @@ import (
 	"log"
 	"time"
 
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
-// 数据库连接单例变量
-var dbInstance *gorm.DB
-
-// GetDB 返回数据库连接实例，使用 SQLite 数据库
+// GetDB returns the PostgreSQL connection initialized by InitDB.
 func GetDB() *gorm.DB {
-	if dbInstance == nil {
-		var err error
-		dbInstance, err = gorm.Open(sqlite.Open("dormcheck.db"), &gorm.Config{})
-		if err != nil {
-			panic(fmt.Sprintf("连接数据库失败: %v", err))
-		}
-
-		// 自动迁移模型，新增 Announcement
-		err = dbInstance.AutoMigrate(&User{}, &UserStudent{}, &Student{}, &Task{}, &EmailVerificationCode{}, &SponsorActivationCode{})
-		if err != nil {
-			panic(fmt.Sprintf("自动迁移失败: %v", err))
-		}
+	if DB == nil {
+		InitDB()
 	}
-	return dbInstance
+	return DB
 }
 
 // SaveStudentOrUpdate 保存或更新学生信息
@@ -38,6 +25,9 @@ func SaveStudentOrUpdate(student *Student) error {
 	err := db.First(&existing, "stu_id = ?", student.StuID).Error
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
+			if student.AuthStatus == "" {
+				student.AuthStatus = "valid"
+			}
 			log.Println("未找到学生记录，准备插入新的学生信息:", student.StuID)
 			if err := db.Create(student).Error; err != nil {
 				return fmt.Errorf("插入学生信息失败: %v", err)
@@ -47,35 +37,32 @@ func SaveStudentOrUpdate(student *Student) error {
 		return err
 	}
 
-	existing.Password = student.Password
-	existing.Cookies = student.Cookies
-	existing.LastLogin = time.Now()
-	existing.Name = student.Name
-
-	log.Println("更新学生信息:", student.StuID)
-	return db.Save(&existing).Error
-}
-
-// BindUserAndStudent 绑定用户与学生学号，支持同时写入学生姓名
-func BindUserAndStudent(userID int, stuID string, name string) error {
-	db := GetDB()
-
-	var existing UserStudent
-	err := db.First(&existing, "user_id = ? AND stu_id = ?", userID, stuID).Error
-	if err != nil {
-		if err == gorm.ErrRecordNotFound {
-			binding := UserStudent{
-				UserID: userID,
-				StuID:  stuID,
-				Name:   name,
-			}
-			return db.Create(&binding).Error
+	return db.Transaction(func(tx *gorm.DB) error {
+		var current Student
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&current, "stu_id = ?", student.StuID).Error; err != nil {
+			return err
 		}
-		return err
-	}
-
-	log.Println("✅ 该用户已绑定该学生，无需重复绑定")
-	return nil
+		current.Password = student.Password
+		current.Cookies = student.Cookies
+		current.LastLogin = time.Now()
+		current.Name = student.Name
+		current.AuthStatus = "valid"
+		current.AuthFailedAt = nil
+		current.AuthError = ""
+		current.AuthNoticeSentAt = nil
+		if err := tx.Save(&current).Error; err != nil {
+			return err
+		}
+		// Restore only tasks paused by the seven-day credential lock. Activity
+		// audit pauses remain in force until the activity itself is healthy.
+		if err := tx.Model(&Task{}).
+			Where("stu_id = ? AND auth_auto_paused = TRUE AND activity_state = ?", student.StuID, "normal").
+			Updates(map[string]interface{}{"enabled": true, "auth_auto_paused": false}).Error; err != nil {
+			return err
+		}
+		log.Println("更新学生信息并恢复账号锁定任务:", student.StuID)
+		return nil
+	})
 }
 
 // GetStudentByStuID 根据学号查找 student 信息，使用 GetDB()

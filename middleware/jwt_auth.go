@@ -4,6 +4,7 @@ import (
 	"dormcheck/database"
 	"dormcheck/utils"
 	"strings"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -32,10 +33,26 @@ func JwtAuth(c *fiber.Ctx) error {
 	if err := database.DB.First(&user, claims.UserID).Error; err != nil {
 		return c.Status(401).JSON(fiber.Map{"error": "用户不存在"})
 	}
+	if user.TokenVersion != claims.TokenVersion {
+		return c.Status(401).JSON(fiber.Map{"error": "登录状态已失效，请重新登录"})
+	}
 
 	// 将 userID 和完整用户信息存入上下文
 	c.Locals("userID", claims.UserID)
 	c.Locals("user", &user)
 
+	return c.Next()
+}
+
+// UserNotBanned keeps banned accounts signed in for status visibility while
+// preventing them from changing shared task/binding state.
+func UserNotBanned(c *fiber.Ctx) error {
+	user, ok := c.Locals("user").(*database.User)
+	if !ok || user == nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "未登录"})
+	}
+	if database.IsUserBanActive(*user, time.Now()) {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": database.UserBanMessage(*user)})
+	}
 	return c.Next()
 }

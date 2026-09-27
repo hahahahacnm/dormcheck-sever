@@ -13,7 +13,7 @@ import (
 
 // GetStudentNameFromDetail 使用已登录 cookies 从新首页提取学生姓名
 func GetStudentNameFromDetail(cookies []*http.Cookie) (string, error) {
-	url := "http://me.swmu.edu.cn/"
+	url := MeBaseURL + "/"
 
 	// 构建请求
 	req, err := http.NewRequest("GET", url, nil)

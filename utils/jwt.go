@@ -21,38 +21,27 @@ func GenerateToken(user database.User) (string, error) {
 		UserID:       user.ID,
 		TokenVersion: user.TokenVersion,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(30 * 24 * time.Hour)), // 30天有效期（为了保障用户体验）
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Duration(config.GetInt("jwt_expiration_hours", 720)) * time.Hour)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(config.JwtSecret)
+	return token.SignedString(config.JWTSecret())
 }
 
 // 验证 token 并校验 tokenVersion 是否与数据库一致
 func ParseToken(tokenStr string) (*Claims, error) {
 	token, err := jwt.ParseWithClaims(tokenStr, &Claims{}, func(token *jwt.Token) (interface{}, error) {
-		return config.JwtSecret, nil
-	})
+		return config.JWTSecret(), nil
+	}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}))
 	if err != nil {
 		return nil, err
 	}
 
 	claims, ok := token.Claims.(*Claims)
-	if !ok || !token.Valid {
+	if !ok || !token.Valid || claims.UserID <= 0 {
 		return nil, errors.New("token无效")
 	}
-
-	// 查询数据库最新的 token_version 进行比对
-	var user database.User
-	err = database.DB.First(&user, claims.UserID).Error
-	if err != nil {
-		return nil, errors.New("用户不存在或数据库异常")
-	}
-	if user.TokenVersion != claims.TokenVersion {
-		return nil, errors.New("token已失效，请重新登录")
-	}
-
 	return claims, nil
 }

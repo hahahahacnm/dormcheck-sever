@@ -3,41 +3,60 @@ package user
 import (
 	"dormcheck/database"
 	"errors"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
+	"time"
 )
 
-// 解绑学号前检查是否还有任务，若无任务才解绑
+// Unbind a user while shared tasks remain only if another user stays bound.
 func UnbindStudent(userID int, stuID string) error {
-	db := database.DB
-
-	// 查询该用户该学号的任务数量
-	var taskCount int64
-	err := db.Model(&database.Task{}).
-		Where("user_id = ? AND stu_id = ?", userID, stuID).
-		Count(&taskCount).Error
-	if err != nil {
-		return err
-	}
-
-	if taskCount > 0 {
-		return errors.New("该学号还有任务未删除，请先删除任务再解绑")
-	}
-
-	// 删除绑定关系
-	result := db.Where("user_id = ? AND stu_id = ?", userID, stuID).Delete(&database.UserStudent{})
-	if result.Error != nil {
-		return result.Error
-	}
-	if result.RowsAffected == 0 {
-		return errors.New("绑定关系不存在")
-	}
-
-	return nil
+	return database.DB.Transaction(func(tx *gorm.DB) error {
+		var bindings []database.UserStudent
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("stu_id = ?", stuID).Find(&bindings).Error; err != nil {
+			return err
+		}
+		found := false
+		for _, binding := range bindings {
+			if binding.UserID == userID {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return errors.New("绑定关系不存在")
+		}
+		var taskCount int64
+		if err := tx.Model(&database.Task{}).Where("stu_id = ?", stuID).Count(&taskCount).Error; err != nil {
+			return err
+		}
+		if taskCount > 0 && len(bindings) <= 1 {
+			return errors.New("该学生目前只有你在使用，删除其所有活动任务后才能解绑")
+		}
+		return tx.Where("user_id = ? AND stu_id = ?", userID, stuID).Delete(&database.UserStudent{}).Error
+	})
 }
 
 // 查询用户已绑定的学号列表
-func GetBoundStudents(userID int) ([]database.UserStudent, error) {
-	var binds []database.UserStudent
-	err := database.DB.Where("user_id = ?", userID).Find(&binds).Error
+type BoundStudentView struct {
+	database.UserStudent
+	AccountStatus       string     `json:"account_status"`
+	AuthFailedAt        *time.Time `json:"auth_failed_at"`
+	AuthError           string     `json:"auth_error"`
+	StudentBanned       bool       `json:"student_banned"`
+	StudentBanReason    string     `json:"student_ban_reason"`
+	StudentBanExpiresAt *time.Time `json:"student_ban_expires_at"`
+}
+
+func GetBoundStudents(userID int) ([]BoundStudentView, error) {
+	var binds []BoundStudentView
+	err := database.DB.Table("user_students").
+		Select(`user_students.*, COALESCE(students.auth_status, 'valid') AS account_status,
+			students.auth_failed_at, students.auth_error,
+			(student_bans.stu_id IS NOT NULL) AS student_banned,
+			student_bans.reason AS student_ban_reason, student_bans.expires_at AS student_ban_expires_at`).
+		Joins("LEFT JOIN students ON students.stu_id = user_students.stu_id").
+		Joins("LEFT JOIN student_bans ON student_bans.stu_id = user_students.stu_id AND (student_bans.expires_at IS NULL OR student_bans.expires_at > ?)", time.Now()).
+		Where("user_students.user_id = ?", userID).Scan(&binds).Error
 	return binds, err
 }
 
